@@ -29,8 +29,11 @@ async def select(sql,args,size=None):
     log(sql,args)
     global __pool
     with (await __pool) as conn:
+        # 获取数据库连接
         cur = await conn.cursor(aiomysql.DictCursor)
+        # 获取数据库游标
         await cur.execute(sql.replace('?','%s'),args or ())
+        # 执行语句
         if size:
             rs =await cur.fetchmany(size)
         else:
