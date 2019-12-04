@@ -7,14 +7,20 @@ from aiohttp import web
 
 
 async def index(request):
-    return web.Response(body=b'<h1>Awesome</h1>',content_type='text/html')
+    return web.Response(body=b'<h1>Awesome</h1>', content_type='text/html')
+
+
+async def name(request):
+    text = '<h1>hello, %s!</h1>' % request.match_info['name']
+    return web.Response(body=text.encode('utf-8'), content_type='text/html')
+
 
 async def init(loop):
     app = web.Application(loop=loop)
-    app.router.add_route('GET','/',index)
+    app.router.add_route('GET', '/', index)
+    app.router.add_route('GET', '/{name}', name)
     # await 返回一个创建好的，绑定IP、端口、HTTP协议簇的监听服务的协程。await的作用是使srv的行为模式和 loop.create_server()一致
-    srv = await loop.create_server(app.make_handler(),'127.0.0.1',9000)
-    print('nihc ')
+    srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
     logging.info('server started at http://127.0.0.1:9000...')
     return srv
 
