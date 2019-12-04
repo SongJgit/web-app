@@ -33,7 +33,7 @@ async def select(sql,args,size=None):
         cur = await conn.cursor(aiomysql.DictCursor)
         # 获取数据库游标
         await cur.execute(sql.replace('?','%s'),args or ())
-        # 执行语句
+        # 用?进行占位,用这些语句时在用%s替换
         if size:
             rs =await cur.fetchmany(size)
         else:
