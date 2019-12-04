@@ -2,6 +2,7 @@ import asyncio
 from aiohttp import web
 import logging
 import aiomysql
+from orm import Model, StringField ,IntegerField
 
 
 async def create_pool(loop,**kw):
@@ -12,8 +13,8 @@ async def create_pool(loop,**kw):
     __pool = await aiomysql.create_pool(
         host=kw.get('host', 'localhost'),
         port=kw.get('port', 3306),
-        user=kw['root'],
-        password=kw['312091156'],
+        user=kw['SJian'],
+        password=kw['123'],
         db=kw['db'],
         charset=kw.get('charset','utf8'),
         autocommit=kw.get('autocommit',True),
@@ -41,5 +42,30 @@ async def select(sql,args,size=None):
         await cur.close()
         logging.info("rows returned: %s" % len(rs))
         return rs
+
+
+async def execute(sql,args):
+    # 通用函数,执行增删改,cursor通过rowcount返回结果数不返回结果集
+    log(sql)
+    with (await __pool) as conn :
+        try:
+            cur  = await conn.cursor()
+            await cur.execute(sql.replace('?','%s').args)
+            affected =cur.rowcount
+            await cur.close()
+        except BaseException as e:
+            raise
+        return
+
+class User(Model):
+    __table__ = 'users'
+
+    id = IntegerField(primary_key=True)
+    name = StringField()
+
+
+user = User(id=312091156, name='SJian')
+user.insert()
+user = user.findAll()
 
 
