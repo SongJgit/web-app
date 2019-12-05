@@ -19,8 +19,8 @@ async def init(loop):
     app = web.Application(loop=loop)
     app.add_routes([web.get('/', index),
                    web.get('/{name}', name)])
-    # await 返回一个创建好的，绑定IP、端口、HTTP协议簇的监听服务的协程。await的作用是使srv的行为模式和 loop.create_server()一致
     srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
+    # 创建TCP服务,监听host地址的port端口,返回一个sever对象
     logging.info('server started at http://127.0.0.1:9000...')
     return srv
 
