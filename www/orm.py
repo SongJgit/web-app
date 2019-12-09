@@ -73,7 +73,7 @@ async def execute(sql,args,autocommit=True):
 
 def create_args_string(num):
     # 用于输出元类中创建sql_insert语句中的占位符
-    L=[]
+    L = []
     for n in range(num):
         L.append('?')
     return ','.join(L)
@@ -83,6 +83,7 @@ def create_args_string(num):
 # orm框架
 class Field(object):
     # 保存数据库的字段名和字段类型
+    # 对数据库的字段进行定义,其子类对应多个类型
     def __init__(self, name, column_type, primary_key, default):
         self.name = name
         self.column_type = column_type
@@ -93,9 +94,8 @@ class Field(object):
         return '<%s, %s:%s>' % (self.__class__.__name__, self.column_type, self.name)
 
 
-# 以下的field分别代表不同的数据属性
 class StringField(Field):
-
+    # 以下的field分别代表不同的数据属性
     def __init__(self, name=None, primary_key=False, default=None, ddl='varchar(100)'):
         super().__init__(name, ddl, primary_key, default)
 
@@ -135,12 +135,12 @@ class ModelMetaclass(type):
         # 用来存储主键以外的属性,而且只保存key
         primaryKey = None
         for k, v in attrs.items():
-            # k属性或方法,v是属性或方法的值
+            # k属性或方法名字,v是值
             if isinstance(v, Field):
-                # 如果为Field类型
+                # 寻找Field类型
                 logging.info('found mapping :%s==>%s' % (k, v))
                 mappings[k] = v
-                # 把键值对存入mappings字典中
+                # 把键值对存入mappings字典中,比如name对应<StringField:username>
                 if v.primary_key:
                     # 找到主键
                     if primaryKey:
@@ -150,24 +150,45 @@ class ModelMetaclass(type):
                     fields.append(k)
         if not primaryKey:
             raise ValueError('Primary key not found')
+        for k in mappings.key():
+            attrs.pop(k)
+            # 从类的实行中删除Field属性,否则有可能出现运行错误,实例的属性会遮盖类的同名属性
+        escaped_fields = list(map(lambda f: '%s' % f, fields))
+        # 保存除主键外的属性名为''(运算出字符串)列表形式
+        attrs['__mappings__'] = mappings
+        # 保存属性和列的映射关系
+        attrs['__table__'] = tableName
+        # 保存表名
+        attrs['__primary_key__'] = primaryKey
+        # 保存主键属性名
+        attrs['__fields__'] = fields
+        # 除主键外的属性名
+        attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ', '.join(escaped_fields), tableName)
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ', '.join(escaped_fields),
+                                                                           primaryKey, create_args_string(len(escaped_fields) + 1))
+        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (tableName,
+                                                                   ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), fields)), primaryKey)
+        attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primaryKey)
+        return type.__new__(cls, name, bases, attrs)
+
+
+class Model(dict,metaclass=ModelMetaclass):
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(r"'Model' object has no attribute '%s'" % key)
+
+    def __setattr__(self, key, value):
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-user = User(id=312091156, name='SJian')
-user.insert()
-user = user.findAll()
 
 
