@@ -184,10 +184,25 @@ class Model(dict,metaclass=ModelMetaclass):
             raise AttributeError(r"'Model' object has no attribute '%s'" % key)
 
     def __setattr__(self, key, value):
+        self[key] = value
 
+    def getValue(self, key):
+        # 返回对象的属性如果没有属性则会调用__getattr__
+        return getattr(self, key, None)
 
+    def getValue0rDefault(self,key):
+        value = getattr(self, key, None)
+        if value is None:
+            field = self.__mapping__[key]
+            if field.default is not None:
+                value = field.default() if callable(field.default) else field.default
+                logging.debug('using default value for %s:%s' % (key,str(value)))
+                setattr(self, key, value)
+        return  value
 
-
+@classmethod
+async def findAll(cls, where=None, args=None, **kw):
+    sql = [cls.__select__]
 
 
 
