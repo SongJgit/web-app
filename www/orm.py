@@ -155,6 +155,7 @@ class ModelMetaclass(type):
             # 从类的实行中删除Field属性,否则有可能出现运行错误,实例的属性会遮盖类的同名属性
         escaped_fields = list(map(lambda f: '%s' % f, fields))
         # 保存除主键外的属性名为''(运算出字符串)列表形式
+        # 子类创建的时候自动将映射关系保存到由Mdodelmetaclass的子类属性当中,
         attrs['__mappings__'] = mappings
         # 保存属性和列的映射关系
         attrs['__table__'] = tableName
@@ -172,7 +173,7 @@ class ModelMetaclass(type):
         return type.__new__(cls, name, bases, attrs)
 
 
-class Model(dict,metaclass=ModelMetaclass):
+class Model(dict, metaclass=ModelMetaclass):
 
     def __init__(self, **kw):
         super().__init__(**kw)
@@ -200,9 +201,70 @@ class Model(dict,metaclass=ModelMetaclass):
                 setattr(self, key, value)
         return  value
 
-@classmethod
-async def findAll(cls, where=None, args=None, **kw):
-    sql = [cls.__select__]
+    @classmethod
+    async def findAll(cls, where=None, args=None, **kw):
+            sql = [cls.__select__]
+            if where:
+                sql.append('where')
+                sql.append(where)
+            if args is None:
+                args = []
+            orderBy = kw.get('orderBy', None)
+            if orderBy:
+                sql.append('order by')
+                sql.append(orderBy)
+            limit = kw.get('limit', None)
+            if limit is not None:
+                sql.append('limit')
+                if isinstance(limit,int):
+                    sql.append('?')
+                    args.append(limit)
+                elif isinstance(limit,tuple) and len(limit) == 2:
+                    sql.append('?,?')
+                    args.extend(limit)
+                else:
+                    raise ValueError('Invalid limit value:%s' % str(limit))
+            rs = await select(''.join(sql), args)
+            return[cls(**r) for r in rs]
+
+    @classmethod
+    async def findNumber(cls, selectField, where=None, args=None):
+
+        sql = ['select %s _num_ from `%s`' % (selectField, cls.__table__)]
+        if where:
+            sql.append('where')
+            sql.append(where)
+        rs = await select(' '.join(sql), args, 1)
+        if len(rs) == 0:
+            return None
+        return rs[0]['_num_']
+
+    @classmethod
+    async def find(cls, pk):
+        rs = await select('%s where `%s`=?' % (cls.__select__, cls.__primary_key__), [pk], 1)
+        if len(rs) == 0:
+            return None
+        return cls(**rs[0])
+
+    async def save(self):
+        args = list(map(self.getValueOrDefault, self.__fields__))
+        args.append(self.getValueOrDefault(self.__primary_key__))
+        rows = await execute(self.__insert__, args)
+        if rows != 1:
+            logging.warn('failed to insert record: affected rows: %s' % rows)
+
+    async def update(self):
+        args = list(map(self.getValue, self.__fields__))
+        args.append(self.getValue(self.__primary_key__))
+        rows = await execute(self.__update__, args)
+        if rows != 1:
+            logging.warn('failed to update by primary key: affected rows: %s' % rows)
+
+    async def remove(self):
+        args = [self.getValue(self.__primary_key__)]
+        rows = await execute(self.__delete__, args)
+        if rows != 1:
+            logging.warn('failed to remove by primary key: affected rows: %s' % rows)
 
 
 
