@@ -8,7 +8,7 @@ def log(sql, args=()):
 
 
 async def create_pool(loop,**kw):
-    # **kw：表示就是形参中按照关键字传值，多余的值都给kw，且以字典*的方式呈现
+    # **kw：表示就是形参中按照关键字传值，多余的值都给kw，且以字典的方式呈现,key:value
     # 创建连接池,保持一定数量的连接
     logging.info('create database connection pool..')
     global __pool
@@ -26,7 +26,7 @@ async def create_pool(loop,**kw):
     )
 
 
-async def select(sql,args,size=None):
+async def select(sql, args, size=None):
     # 传入sql语句和参数
     # args：表示就是将实参中按照位置传值
     log(sql, args)
@@ -50,7 +50,7 @@ async def destory_pool():
         await __pool.await_closed
 
 
-async def execute(sql,args,autocommit=True):
+async def execute(sql, args, autocommit=True):
     # 通用函数,执行增删改,cursor通过rowcount返回结果数不返回结果集
     log(sql)
     async with __pool.get() as conn:
@@ -153,7 +153,7 @@ class ModelMetaclass(type):
         for k in mappings.key():
             attrs.pop(k)
             # 从类的实行中删除Field属性,否则有可能出现运行错误,实例的属性会遮盖类的同名属性
-        escaped_fields = list(map(lambda f: '%s' % f, fields))
+        escaped_fields = list(map(lambda f: '`%s`' % f, fields))
         # 保存除主键外的属性名为''(运算出字符串)列表形式
         # 子类创建的时候自动将映射关系保存到由Mdodelmetaclass的子类属性当中,
         attrs['__mappings__'] = mappings
@@ -191,7 +191,7 @@ class Model(dict, metaclass=ModelMetaclass):
         # 返回对象的属性如果没有属性则会调用__getattr__
         return getattr(self, key, None)
 
-    def getValue0rDefault(self,key):
+    def getValue0rDefault(self, key):
         value = getattr(self, key, None)
         if value is None:
             field = self.__mapping__[key]
@@ -210,6 +210,7 @@ class Model(dict, metaclass=ModelMetaclass):
             if args is None:
                 args = []
             orderBy = kw.get('orderBy', None)
+            # dict 的get方法,如果有对应的值则返回对应的值否则返回默认值
             if orderBy:
                 sql.append('order by')
                 sql.append(orderBy)
