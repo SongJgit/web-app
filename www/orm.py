@@ -15,9 +15,9 @@ async def create_pool(loop,**kw):
     __pool = await aiomysql.create_pool(
         host=kw.get('host', 'localhost'),
         port=kw.get('port', 3306),
-        user=kw['SJian'],
-        password=kw['123'],
-        db=kw['db'],
+        user=kw['user'],
+        password=kw['password'],
+        db=kw['database'],
         charset=kw.get('charset','utf8'),
         autocommit=kw.get('autocommit',True),
         maxsize=kw.get('maxsize', 10),
@@ -59,7 +59,7 @@ async def execute(sql, args, autocommit=True):
         try:
             async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(sql.replace('?','%s'),args)
-                affected =cur.rowcount
+                affected = cur.rowcount
             if not autocommit:
                 await  conn.commit()
         except BaseException as e:
@@ -87,15 +87,16 @@ class Field(object):
     def __init__(self, name, column_type, primary_key, default):
         self.name = name
         self.column_type = column_type
-        self.primary_kry = primary_key
+        self.primary_key = primary_key
         self.default = default
 
     def __str__(self):
         return '<%s, %s:%s>' % (self.__class__.__name__, self.column_type, self.name)
 
 
+# 以下的field分别代表不同的数据属性
 class StringField(Field):
-    # 以下的field分别代表不同的数据属性
+
     def __init__(self, name=None, primary_key=False, default=None, ddl='varchar(100)'):
         super().__init__(name, ddl, primary_key, default)
 
@@ -108,6 +109,12 @@ class BooleanField(Field):
 class IntegerField(Field):
 
     def __init__(self, name=None, primary_key=False, default=0):
+        super().__init__(name, 'real', primary_key, default)
+
+
+class FloatField(Field):
+
+    def __init__(self, name=None, primary_key=False, default=0.0):
         super().__init__(name, 'real', primary_key, default)
 
 
@@ -134,6 +141,9 @@ class ModelMetaclass(type):
         fields = []
         # 用来存储主键以外的属性,而且只保存key
         primaryKey = None
+
+        print(attrs)
+
         for k, v in attrs.items():
             # k属性或方法名字,v是值
             if isinstance(v, Field):
@@ -145,12 +155,12 @@ class ModelMetaclass(type):
                     # 找到主键
                     if primaryKey:
                         raise ValueError('Duplicate primary key for field :%s'% k)
-                    primaryKey = k # 此列设置为列表的主键
+                    primaryKey = k  # 此列设置为列表的主键
                 else:
                     fields.append(k)
         if not primaryKey:
             raise ValueError('Primary key not found')
-        for k in mappings.key():
+        for k in mappings.keys():
             attrs.pop(k)
             # 从类的实行中删除Field属性,否则有可能出现运行错误,实例的属性会遮盖类的同名属性
         escaped_fields = list(map(lambda f: '`%s`' % f, fields))
@@ -191,10 +201,10 @@ class Model(dict, metaclass=ModelMetaclass):
         # 返回对象的属性如果没有属性则会调用__getattr__
         return getattr(self, key, None)
 
-    def getValue0rDefault(self, key):
+    def getValueOrDefault(self, key):
         value = getattr(self, key, None)
         if value is None:
-            field = self.__mapping__[key]
+            field = self.__mappings__[key]
             if field.default is not None:
                 value = field.default() if callable(field.default) else field.default
                 logging.debug('using default value for %s:%s' % (key,str(value)))
